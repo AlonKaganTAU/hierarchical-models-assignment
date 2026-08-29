@@ -1,0 +1,113 @@
+Loaded 5025 trials from 35 subjects.
+
+#### Fitting Model 0: stay ~ 1 + (1 | participant) ####
+Loading cached fit: analysis/fits/fit0.rds
+ Family: bernoulli 
+  Links: mu = logit 
+Formula: stay ~ 1 + (1 | participant) 
+   Data: df (Number of observations: 5025) 
+  Draws: 4 chains, each with iter = 3000; warmup = 1000; thin = 1;
+         total post-warmup draws = 8000
+
+Group-Level Effects: 
+~participant (Number of levels: 35) 
+              Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+sd(Intercept)     0.98      0.14     0.76     1.30 1.01      905     1708
+
+Population-Level Effects: 
+          Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+Intercept    -0.59      0.17    -0.93    -0.24 1.01      449      722
+
+Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
+and Tail_ESS are effective sample size measures, and Rhat is the potential
+scale reduction factor on split chains (at convergence, Rhat = 1).
+
+Unconditional ICC (latent-threshold method):
+   median      2.5%     97.5% 
+0.2218434 0.1487815 0.3404643 
+
+#### Fitting Model 1 (maximal RE): stay ~ reward + (reward | participant) ####
+Loading cached fit: analysis/fits/fit1_maximal.rds
+ Family: bernoulli 
+  Links: mu = logit 
+Formula: stay ~ reward + (reward | participant) 
+   Data: df (Number of observations: 5025) 
+  Draws: 4 chains, each with iter = 3000; warmup = 1000; thin = 1;
+         total post-warmup draws = 8000
+
+Group-Level Effects: 
+~participant (Number of levels: 35) 
+                      Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
+sd(Intercept)             1.37      0.20     1.03     1.82 1.00     1696
+sd(reward)                1.82      0.25     1.40     2.37 1.00     1281
+cor(Intercept,reward)    -0.52      0.14    -0.75    -0.22 1.00     1345
+                      Tail_ESS
+sd(Intercept)             3098
+sd(reward)                2874
+cor(Intercept,reward)     2565
+
+Population-Level Effects: 
+          Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+Intercept    -1.12      0.24    -1.59    -0.65 1.00      778     1586
+reward        1.00      0.31     0.39     1.60 1.00     1049     1903
+
+Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
+and Tail_ESS are effective sample size measures, and Rhat is the potential
+scale reduction factor on split chains (at convergence, Rhat = 1).
+
+Model 1 maximal RE converged: TRUE
+
+#### Fitting Model 2 (maximal RE): stay ~ reward * K_c + (reward | participant) ####
+ Family: bernoulli 
+  Links: mu = logit 
+Formula: stay ~ reward * K_c + (reward | participant) 
+   Data: df (Number of observations: 5025) 
+  Draws: 4 chains, each with iter = 3000; warmup = 1000; thin = 1;
+         total post-warmup draws = 8000
+
+Group-Level Effects: 
+~participant (Number of levels: 35) 
+                      Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS
+sd(Intercept)             1.36      0.21     1.01     1.83 1.00     1740
+sd(reward)                1.80      0.26     1.37     2.38 1.00     1487
+cor(Intercept,reward)    -0.48      0.15    -0.73    -0.15 1.00     1400
+                      Tail_ESS
+sd(Intercept)             3120
+sd(reward)                2372
+cor(Intercept,reward)     2717
+
+Population-Level Effects: 
+           Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+Intercept     -1.12      0.23    -1.58    -0.67 1.00     1138     2278
+reward         0.99      0.31     0.38     1.63 1.00     1153     2153
+K_c            0.29      0.21    -0.13     0.72 1.00     1270     2069
+reward:K_c    -0.41      0.28    -0.97     0.14 1.00     1238     2344
+
+Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
+and Tail_ESS are effective sample size measures, and Rhat is the potential
+scale reduction factor on split chains (at convergence, Rhat = 1).
+
+Model 2 maximal RE converged: TRUE
+
+#### Model comparison ####
+     elpd_diff se_diff
+fit2  0.0       0.0   
+fit1 -0.2       0.5   
+
+Model 1 bayes_R2 (marginal):
+     Estimate Est.Error        Q2.5     Q97.5
+R2 0.05458017 0.0292025 0.007850377 0.1195907
+Model 1 bayes_R2 (conditional):
+    Estimate   Est.Error      Q2.5     Q97.5
+R2 0.2752049 0.007585375 0.2596518 0.2895485
+Model 2 bayes_R2 (marginal):
+     Estimate Est.Error      Q2.5     Q97.5
+R2 0.07211439 0.0302395 0.0208574 0.1378356
+Model 2 bayes_R2 (conditional):
+    Estimate   Est.Error      Q2.5     Q97.5
+R2 0.2756421 0.007548361 0.2605631 0.2900666
+
+Interaction (reward x K_c) posterior summary:
+    median       2.5%      97.5% 
+-0.4075264 -0.9690994  0.1428430 
+Probability of direction (pd): 0.9314
