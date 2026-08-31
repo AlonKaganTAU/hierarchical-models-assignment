@@ -80,6 +80,10 @@ model_has_converged <- function(fit) {
     min(c(draws_smry$ess_bulk, draws_smry$ess_tail), na.rm = TRUE) >= 400
 }
 
+# Helper to report posterior credible intervals and probability of direction (pd).
+# pd is the one-sided posterior probability: max(P(x > 0), P(x < 0)), interpreted as
+# the strength of evidence for a non-zero effect in the direction with more posterior mass.
+# On the probability scale, pd ≈ 0.95 means ~95% of the posterior is non-zero in one direction.
 post_summary <- function(x, label) {
   cat(sprintf("%-34s %6.3f [%6.3f, %6.3f]  pd = %.3f\n", label,
               median(x), quantile(x, 0.025), quantile(x, 0.975),

@@ -74,12 +74,27 @@ preds_b <- grid_b |>
             Q2.5     = quantile(reward_effect, 0.025),
             Q97.5    = quantile(reward_effect, 0.975))
 
+# Extract interaction parameter for annotation
+d2 <- as_draws_df(fit2)
+gamma_11_median <- median(d2$`b_reward:K_c`)
+gamma_11_q025 <- quantile(d2$`b_reward:K_c`, 0.025)
+gamma_11_q975 <- quantile(d2$`b_reward:K_c`, 0.975)
+gamma_11_pd <- max(mean(d2$`b_reward:K_c` > 0), mean(d2$`b_reward:K_c` < 0))
+
+annotation_text <- sprintf(
+  "γ₁₁ = %.3f [%.3f, %.3f]\npd = %.3f",
+  gamma_11_median, gamma_11_q025, gamma_11_q975, gamma_11_pd
+)
+
 p_b <- ggplot(preds_b, aes(K, Estimate)) +
   geom_hline(yintercept = 0, linetype = "dashed", colour = "grey50") +
   geom_ribbon(aes(ymin = Q2.5, ymax = Q97.5), fill = "#0072B2", alpha = 0.15) +
   geom_line(colour = "#0072B2", linewidth = 0.8) +
   geom_point(data = observed, aes(K, reward_effect), alpha = 0.6, size = 1.4,
              inherit.aes = FALSE) +
+  annotate("text", x = Inf, y = Inf, label = annotation_text,
+           hjust = 1.1, vjust = 1.3, size = 2.8, family = "mono",
+           colour = "#0072B2", fontface = "bold") +
   scale_y_continuous(labels = scales::label_percent(accuracy = 1)) +
   labs(x = "Working memory capacity (K)",
        y = "Reward effect on P(stay)", tag = "B") +
