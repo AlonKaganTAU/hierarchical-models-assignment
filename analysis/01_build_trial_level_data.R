@@ -2,8 +2,8 @@ rm(list = ls())
 
 #### SETUP ####
 library(dplyr)
-library(tidyr)
 library(readr)
+library(purrr)
 library(stringr)
 
 DATA_TASK <- "data/raw/task"
@@ -14,101 +14,125 @@ OUT_CSV   <- "data/trial_level.csv"
 # fixed inter-trial interval, N = 35). This script reuses that pipeline's WM
 # capacity computation and trial-pairing logic, but keeps all 35 subjects (no
 # understood/felt exclusion) and returns trial-level data rather than
-# per-subject WSLS betas, since the assignment models the trial-level outcome
-# directly with a reward_oneback x K cross-level interaction.
+# per-subject WSLS betas: the assignment models the trial-level DV directly,
+# with reward x K as a cross-level interaction.
+#
+# Output columns, by level of the hierarchy:
+#   participant   - the random grouping variable
+#   block_number  - 6 blocks per participant (level 1.5; see 02 for the
+#                   three-level check that justifies ignoring it)
+#   trial_number  - position within block
+#   reward (L1)   - outcome of the PREVIOUS trial, 0/1 (= reward_oneback in the
+#                   raw files); this is the level 1 predictor
+#   stay   (L1)   - whether the same machine was chosen again, 0/1 (the DV)
+#   K      (L2)   - working memory capacity, one value per participant
+#   K_c    (L2)   - K grand-mean centred on the analysed sample
 
-#### WORKING MEMORY CAPACITY (COWAN'S K) ####
-# One K per set size, K = set_size * (hit rate + correct rejection rate - 1),
-# where condition "d" = change trials (hits) and "s" = no-change trials
-# (correct rejections). A participant's K is the mean over the two set sizes.
+#### WM CAPACITY (K) PER SUBJECT ####
+# Cowan's K = set size * (hit rate + correct rejection rate - 1), where the
+# "different" trials give hits and the "same" trials give correct rejections.
+# K is averaged over the two experimental set sizes (4 and 8).
 wm_files <- list.files(DATA_WM, pattern = "^ioc-wm_[a-f0-9]{24}_SESSION.*\\.csv$", full.names = TRUE)
 
-wm <- read_csv(wm_files, id = "file", show_col_types = FALSE,
-               col_types = cols(.default = col_character())) |>
-  mutate(participant = str_extract(file, "[a-f0-9]{24}")) |>
-  filter(trial_name == "test_squares", block_type == "exp") |>
-  mutate(set_size = as.numeric(set_size),
-         correct  = tolower(accuracy) == "true") |>
-  summarise(accuracy = mean(correct), .by = c(participant, set_size, condition)) |>
-  pivot_wider(names_from = condition, values_from = accuracy) |>
-  mutate(k_set_size = set_size * (d + s - 1)) |>
-  summarise(K = mean(k_set_size), .by = participant)
+wm <- wm_files |>
+  map(\(f) {
+    pid <- str_extract(f, "[a-f0-9]{24}")
+    exp <- read_csv(f, show_col_types = FALSE, col_types = cols(.default = col_character())) |>
+      filter(trial_name == "test_squares", block_type == "exp") |>
+      mutate(set_size = as.numeric(set_size),
+             acc_bool = tolower(accuracy) == "true")
+
+    k_by_set_size <- map_dbl(c(4, 8), \(ss) {
+      trials    <- exp |> filter(set_size == ss)
+      different <- trials |> filter(condition == "d")
+      same      <- trials |> filter(condition == "s")
+      if (nrow(different) == 0 || nrow(same) == 0) return(NA_real_)
+      ss * (mean(different$acc_bool) + mean(same$acc_bool) - 1)
+    })
+    tibble(participant = pid, K = mean(k_by_set_size, na.rm = TRUE))
+  }) |>
+  list_rbind()
 
 #### TRIAL-LEVEL STAY / REWARD PAIRS ####
 task_files <- list.files(DATA_TASK, pattern = "^ioc-all_[a-f0-9]{24}_SESSION.*\\.csv$", full.names = TRUE)
 
-df_raw <- read_csv(task_files, id = "file", show_col_types = FALSE,
-                   col_types = cols(.default = col_character())) |>
-  mutate(participant = str_extract(file, "[a-f0-9]{24}"))
+df_raw <- task_files |>
+  map(\(f) {
+    pid <- str_extract(f, "[a-f0-9]{24}")
+    read_csv(f, show_col_types = FALSE, col_types = cols(.default = col_character())) |>
+      mutate(participant = pid)
+  }) |>
+  list_rbind()
 
-# The lag is taken before any filtering, so choice_oneback and reward_oneback
-# always refer to the trial that physically preceded the current one within the
-# same block. Trials are kept only when both they and their predecessor carry a
-# valid (non-timed-out) response.
+# Trials are paired within block, so the first trial of every block drops out
+# (it has no preceding trial). A pair is kept only when BOTH trials carried a
+# valid, non-timed-out response - otherwise "stay" is undefined.
 df <- df_raw |>
   filter(task == "gambling_choice", block_number != "training") |>
-  mutate(block_number    = as.numeric(block_number),
-         trial_number    = as.numeric(trial_number),
+  mutate(trial_number    = as.numeric(trial_number),
          reward          = as.numeric(reward),
+         reward_oneback  = as.numeric(reward_oneback),
          is_choice_valid = as.logical(is_choice_valid)) |>
   arrange(participant, block_number, trial_number) |>
-  mutate(choice_oneback = lag(choice_key),
-         valid_oneback  = lag(is_choice_valid),
-         reward_oneback = lag(reward),
-         .by = c(participant, block_number)) |>
-  filter(is_choice_valid, valid_oneback, !is.na(reward_oneback)) |>
-  mutate(stay = as.integer(choice_key == choice_oneback)) |>
-  select(participant, block_number, trial_number, reward_oneback, stay)
+  group_by(participant, block_number) |>
+  mutate(choice_prev = lag(choice_key),
+         valid_prev  = lag(is_choice_valid),
+         reward_prev = lag(reward)) |>
+  ungroup()
 
-#### ADD LEVEL-2 PREDICTOR AND CENTER EACH VARIABLE AT ITS OWN LEVEL ####
-# K is time-invariant (level 2) and is centered on the mean of the analysed
-# sample, so that 0 = average capacity in this study. reward_oneback is a
-# measured time-varying (level 1) predictor, so it is additionally split into a
-# person mean (between-person, level 2) and a person-mean-centered deviation
-# (within-person, level 1) to keep the two sources of variance from being
-# smushed into a single coefficient.
-subjects <- df |>
-  distinct(participant) |>
+# The raw files already carry choice_key_oneback / reward_oneback. We derive the
+# lags ourselves (so the pairing rule is explicit and auditable) and then check
+# the two agree - if they ever disagree, the trial ordering assumption is wrong.
+lag_check <- df |>
+  filter(is_choice_valid, valid_prev) |>
+  summarise(reward_mismatch = sum(reward_prev != reward_oneback, na.rm = TRUE),
+            choice_mismatch = sum(choice_prev != choice_key_oneback, na.rm = TRUE))
+cat(sprintf("Lag check vs. raw *_oneback columns: %d reward mismatches, %d choice mismatches\n",
+            lag_check$reward_mismatch, lag_check$choice_mismatch))
+
+# Staying is only meaningful if the previous machine is still on offer. In this
+# pilot no machine was ever withheld, but we check rather than assume.
+cat(sprintf("Trials where the previous choice was unavailable: %d\n",
+            sum(df$unavailable_keys != "[]", na.rm = TRUE)))
+
+df <- df |>
+  filter(is_choice_valid, valid_prev, !is.na(reward_prev)) |>
+  mutate(stay = as.integer(choice_key == choice_prev)) |>
+  select(participant, block_number, trial_number, reward = reward_prev, stay)
+
+#### MERGE WITH WM CAPACITY ####
+# One WM file has no matching task file, so the inner join drops it. K must
+# therefore be centred AFTER the join - centring on the raw WM table would
+# centre on a person who is not in the analysis, and the fixed intercept would
+# no longer sit at the analysed sample's mean K.
+df <- df |>
   inner_join(wm, by = "participant") |>
-  mutate(K_c = K - mean(K))
+  filter(!is.na(K))
 
-df <- df |>
-  inner_join(subjects, by = "participant") |>
-  mutate(reward_oneback_pm = mean(reward_oneback),
-         reward_oneback_wp = reward_oneback - reward_oneback_pm,
-         .by = participant)
-
-reward_pm_grand <- df |>
-  distinct(participant, reward_oneback_pm) |>
-  pull(reward_oneback_pm) |>
-  mean()
-
-df <- df |>
-  mutate(reward_oneback_pm_c = reward_oneback_pm - reward_pm_grand)
+K_by_subject <- df |> distinct(participant, K)
+df <- df |> mutate(K_c = K - mean(K_by_subject$K))
 
 #### SANITY CHECKS ####
-cat(sprintf("Subjects: %d, trials: %d\n", nrow(subjects), nrow(df)))
+n_subjects <- n_distinct(df$participant)
+cat(sprintf("WM files: %d; task files: %d; subjects in analysis: %d\n",
+            nrow(wm), length(task_files), n_subjects))
 
-trials_per_subject <- count(df, participant, name = "n_trials")
+trials_per_subject <- df |> count(participant, name = "n_trials")
 cat(sprintf("Trials per subject: min = %d, max = %d, mean = %.1f\n",
             min(trials_per_subject$n_trials), max(trials_per_subject$n_trials),
             mean(trials_per_subject$n_trials)))
 
-cat(sprintf("Blocks per subject: %s\n",
-            paste(unique(summarise(df, b = n_distinct(block_number), .by = participant)$b), collapse = ", ")))
+cat(sprintf("K: mean = %.2f, SD = %.2f, range %.2f to %.2f (%d subjects below 0)\n",
+            mean(K_by_subject$K), sd(K_by_subject$K),
+            min(K_by_subject$K), max(K_by_subject$K), sum(K_by_subject$K < 0)))
 
-cat(sprintf("K: range %.2f to %.2f, mean %.2f, between-subject SD %.2f\n",
-            min(subjects$K), max(subjects$K), mean(subjects$K), sd(subjects$K)))
+cat(sprintf("Reward rate: %.3f overall; between-subject range %.3f to %.3f\n",
+            mean(df$reward),
+            min(tapply(df$reward, df$participant, mean)),
+            max(tapply(df$reward, df$participant, mean))))
 
-cat(sprintf("K_c mean over subjects (should be 0): %.12f\n", mean(subjects$K_c)))
-
-cat(sprintf("Person reward rate: range %.2f to %.2f, between-subject SD %.3f\n",
-            min(df$reward_oneback_pm), max(df$reward_oneback_pm),
-            sd(distinct(df, participant, reward_oneback_pm)$reward_oneback_pm)))
-
-cat(sprintf("Missing values in modelled columns: %d\n",
-            sum(is.na(df$reward_oneback) | is.na(df$stay) | is.na(df$K_c))))
+cat(sprintf("Missing reward/stay in final data: %d\n", sum(is.na(df$reward) | is.na(df$stay))))
 
 #### WRITE OUTPUT ####
 write_csv(df, OUT_CSV)
-cat(sprintf("\nSaved -> %s (%d rows)\n", OUT_CSV, nrow(df)))
+cat(sprintf("\nSaved -> %s (%d rows, %d subjects)\n", OUT_CSV, nrow(df), n_subjects))
