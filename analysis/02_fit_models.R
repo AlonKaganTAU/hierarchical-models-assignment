@@ -2,20 +2,21 @@ rm(list = ls())
 
 #### SETUP ####
 library(dplyr)
-library(brms)
-library(loo)
-library(posterior)
-library(bayesplot)
+library(lme4)
+library(lmerTest)
+library(performance)
+library(parameters)
+library(marginaleffects)
 
-DATA_CSV  <- "data/trial_level.csv"
-FITS_DIR  <- "analysis/fits"
-LOG_FILE  <- "analysis/model_log.txt"
+# r2_pseudo(): course helper for the proportional reduction in a random-effect
+# variance component between two nested models (used for GLMM effect sizes,
+# since performance::r2()/r2_nakagawa() are not used for GLMMs in this course).
+source("https://github.com/mattansb/Hierarchical-Linear-Models-foR-Psychologists/raw/refs/heads/main/helpers.R")
+
+DATA_CSV <- "data/trial_level.csv"
+LOG_FILE <- "analysis/model_log.txt"
+FITS_DIR <- "analysis/fits"
 dir.create(FITS_DIR, showWarnings = FALSE, recursive = TRUE)
-
-CHAINS  <- 4
-ITER    <- 3000
-WARMUP  <- 1000
-CORES   <- 4
 
 log_con <- file(LOG_FILE, open = "wt")
 sink(log_con, split = TRUE)
@@ -25,116 +26,132 @@ df <- read.csv(DATA_CSV) |>
 
 cat(sprintf("Loaded %d trials from %d subjects.\n\n", nrow(df), n_distinct(df$participant)))
 
-# Fits (or, on a rerun, loads) one model and caches it to FITS_DIR, so an
-# interrupted run does not have to recompile/resample everything from scratch.
-fit_or_load <- function(formula, name) {
-  path <- file.path(FITS_DIR, paste0(name, ".rds"))
-  if (file.exists(path)) {
-    cat(sprintf("Loading cached fit: %s\n", path))
-    return(readRDS(path))
-  }
-  fit <- brm(formula, data = df, family = bernoulli(),
-             chains = CHAINS, iter = ITER, warmup = WARMUP, cores = CORES,
-             refresh = 0, backend = "rstan")
-  saveRDS(fit, path)
-  fit
-}
-
-# A model has converged if there are no post-warmup divergent transitions and
-# every Rhat is below 1.01; anything else falls back to the simpler
-# random-effects structure, and both attempts are kept for reporting.
-model_has_converged <- function(fit) {
-  divergences <- sum(subset(nuts_params(fit), Parameter == "divergent__")$Value)
-  rhat_ok     <- all(posterior::rhat(fit) < 1.01, na.rm = TRUE)
-  divergences == 0 && rhat_ok
-}
-
-#### MODEL 0 — unconditional (intercept-only), for the ICC ####
+#### MODEL 0 — empty (unconditional), for the ICC ####
 cat("#### Fitting Model 0: stay ~ 1 + (1 | participant) ####\n")
-fit0 <- fit_or_load(stay ~ 1 + (1 | participant), "fit0")
-print(summary(fit0))
+fit0 <- glmer(
+  stay ~ 1 + (1 | participant),
+  family = binomial(link = "logit"),
+  data = df
+)
+print(model_parameters(fit0))
 
-tau00_draws <- as_draws_df(fit0)$sd_participant__Intercept^2
-icc_draws   <- tau00_draws / (tau00_draws + pi^2 / 3)
-icc_summary <- c(median = median(icc_draws), quantile(icc_draws, c(0.025, 0.975)))
-cat("\nUnconditional ICC (latent-threshold method):\n")
-print(icc_summary)
+cat("\nUnconditional ICC (performance::icc(), Model 0):\n")
+print(icc(fit0))
+cat(sprintf("\nLevel-1 variance is fixed by the logit link at pi^2/3 = %.4f\n", pi^2 / 3))
 
-#### MODEL 1 — reward only (baseline for the comparison) ####
-cat("\n#### Fitting Model 1 (maximal RE): stay ~ reward + (reward | participant) ####\n")
-fit1_max <- fit_or_load(stay ~ reward + (reward | participant), "fit1_maximal")
-print(summary(fit1_max))
+#### MODEL 1 — reward_oneback only (baseline for the comparison) ####
+# Maximal random-effects structure (Barr et al., 2013): random intercept and
+# slope for reward_oneback, allowed to correlate. If this is singular or fails
+# to converge, apply the remedies in the order taught (control tweaks, then
+# optimizer, then dropping only the random *correlation* via || - never
+# dropping a random slope/intercept outright).
+cat("\n#### Fitting Model 1 (maximal RE): stay ~ reward_oneback + (reward_oneback | participant) ####\n")
+fit1 <- glmer(
+  stay ~ reward_oneback + (reward_oneback | participant),
+  family = binomial(link = "logit"),
+  data = df
+)
+cat(sprintf("Model 1 singular: %s | converged: %s\n", isSingular(fit1), is.null(fit1@optinfo$conv$lme4$messages)))
 
-fit1_converged <- model_has_converged(fit1_max)
-cat(sprintf("\nModel 1 maximal RE converged: %s\n", fit1_converged))
-
-if (fit1_converged) {
-  fit1 <- fit1_max
-} else {
-  cat("\n#### Falling back: Model 1 with (1 | participant) only ####\n")
-  fit1_fallback <- fit_or_load(stay ~ reward + (1 | participant), "fit1_fallback")
-  print(summary(fit1_fallback))
-  fit1 <- fit1_fallback
+if (isSingular(fit1) || !is.null(fit1@optinfo$conv$lme4$messages)) {
+  cat("Retrying Model 1 with glmerControl(calc.derivs = FALSE)...\n")
+  fit1 <- glmer(
+    stay ~ reward_oneback + (reward_oneback | participant),
+    family = binomial(link = "logit"),
+    data = df,
+    control = glmerControl(calc.derivs = FALSE)
+  )
 }
-saveRDS(fit1, file.path(FITS_DIR, "fit1_final.rds"))
-
-#### MODEL 2 — reward x K_c cross-level interaction (key model) ####
-cat("\n#### Fitting Model 2 (maximal RE): stay ~ reward * K_c + (reward | participant) ####\n")
-fit2_max <- fit_or_load(stay ~ reward * K_c + (reward | participant), "fit2_maximal")
-print(summary(fit2_max))
-
-fit2_converged <- model_has_converged(fit2_max)
-cat(sprintf("\nModel 2 maximal RE converged: %s\n", fit2_converged))
-
-if (fit2_converged) {
-  fit2 <- fit2_max
-} else {
-  cat("\n#### Falling back: Model 2 with (1 | participant) only ####\n")
-  fit2_fallback <- fit_or_load(stay ~ reward * K_c + (1 | participant), "fit2_fallback")
-  print(summary(fit2_fallback))
-  fit2 <- fit2_fallback
+if (isSingular(fit1) || !is.null(fit1@optinfo$conv$lme4$messages)) {
+  cat("Retrying Model 1 with the bobyqa optimizer...\n")
+  fit1 <- glmer(
+    stay ~ reward_oneback + (reward_oneback | participant),
+    family = binomial(link = "logit"),
+    data = df,
+    control = glmerControl("bobyqa")
+  )
 }
-saveRDS(fit2, file.path(FITS_DIR, "fit2_final.rds"))
+if (isSingular(fit1) || !is.null(fit1@optinfo$conv$lme4$messages)) {
+  cat("Retrying Model 1 dropping the random intercept-slope correlation (||)...\n")
+  fit1 <- glmer(
+    stay ~ reward_oneback + (reward_oneback || participant),
+    family = binomial(link = "logit"),
+    data = df
+  )
+}
+print(model_parameters(fit1, exponentiate = TRUE))
+
+#### MODEL 2 — reward_oneback x K_c cross-level interaction (key model) ####
+cat("\n#### Fitting Model 2 (maximal RE): stay ~ reward_oneback * K_c + (reward_oneback | participant) ####\n")
+fit2 <- glmer(
+  stay ~ reward_oneback * K_c + (reward_oneback | participant),
+  family = binomial(link = "logit"),
+  data = df
+)
+cat(sprintf("Model 2 singular: %s | converged: %s\n", isSingular(fit2), is.null(fit2@optinfo$conv$lme4$messages)))
+
+if (isSingular(fit2) || !is.null(fit2@optinfo$conv$lme4$messages)) {
+  cat("Retrying Model 2 with glmerControl(calc.derivs = FALSE)...\n")
+  fit2 <- glmer(
+    stay ~ reward_oneback * K_c + (reward_oneback | participant),
+    family = binomial(link = "logit"),
+    data = df,
+    control = glmerControl(calc.derivs = FALSE)
+  )
+}
+if (isSingular(fit2) || !is.null(fit2@optinfo$conv$lme4$messages)) {
+  cat("Retrying Model 2 with the bobyqa optimizer...\n")
+  fit2 <- glmer(
+    stay ~ reward_oneback * K_c + (reward_oneback | participant),
+    family = binomial(link = "logit"),
+    data = df,
+    control = glmerControl("bobyqa")
+  )
+}
+if (isSingular(fit2) || !is.null(fit2@optinfo$conv$lme4$messages)) {
+  cat("Retrying Model 2 dropping the random intercept-slope correlation (||)...\n")
+  fit2 <- glmer(
+    stay ~ reward_oneback * K_c + (reward_oneback || participant),
+    family = binomial(link = "logit"),
+    data = df
+  )
+}
+print(model_parameters(fit2, exponentiate = TRUE))
 
 #### MODEL COMPARISON: Model 1 vs Model 2 ####
-cat("\n#### Model comparison ####\n")
-fit1 <- add_criterion(fit1, "loo")
-fit2 <- add_criterion(fit2, "loo")
-comparison <- loo_compare(fit1, fit2)
+cat("\n#### Model comparison (likelihood-ratio test; GLMMs are ML only, no refit needed) ####\n")
+comparison <- anova(fit1, fit2)
 print(comparison)
 
-r2_fit1_marginal    <- bayes_R2(fit1, re_formula = NA)
-r2_fit1_conditional <- bayes_R2(fit1)
-r2_fit2_marginal    <- bayes_R2(fit2, re_formula = NA)
-r2_fit2_conditional <- bayes_R2(fit2)
+cat("\nPseudo R2 (reduction in random-effect variance, Model 2 vs Model 1):\n")
+print(r2_pseudo(fit2, fit1))
 
-cat("\nModel 1 bayes_R2 (marginal):\n");    print(r2_fit1_marginal)
-cat("Model 1 bayes_R2 (conditional):\n");   print(r2_fit1_conditional)
-cat("Model 2 bayes_R2 (marginal):\n");      print(r2_fit2_marginal)
-cat("Model 2 bayes_R2 (conditional):\n");   print(r2_fit2_conditional)
+#### FIXED EFFECTS: odds ratios and average marginal effects ####
+cat("\n#### Model 2 fixed effects: odds ratios (model_parameters) ####\n")
+print(model_parameters(fit2, exponentiate = TRUE))
 
-#### INTERACTION EFFECT (primary result) ####
-interaction_draws <- as_draws_df(fit2)$`b_reward:K_c`
-interaction_summary <- c(median = median(interaction_draws), quantile(interaction_draws, c(0.025, 0.975)))
-interaction_pd <- max(mean(interaction_draws > 0), mean(interaction_draws < 0))
+cat("\n#### Model 2: average marginal effect of reward_oneback on P(stay) ####\n")
+print(avg_slopes(fit2, variables = "reward_oneback", re.form = NULL))
 
-cat("\nInteraction (reward x K_c) posterior summary:\n")
-print(interaction_summary)
-cat(sprintf("Probability of direction (pd): %.4f\n", interaction_pd))
+cat("\n#### Model 2: average odds ratio for reward_oneback ####\n")
+print(avg_comparisons(fit2, variables = "reward_oneback", comparison = "lnor", transform = "exp"))
+
+#### CONVERGENCE / SINGULARITY SUMMARY ####
+cat("\n#### Convergence diagnostics ####\n")
+cat(sprintf("Model 1 singular: %s\n", check_singularity(fit1)))
+cat(sprintf("Model 2 singular: %s\n", check_singularity(fit2)))
+print(check_convergence(fit1))
+print(check_convergence(fit2))
 
 results <- list(
-  icc_draws            = icc_summary,
-  fit1_converged       = fit1_converged,
-  fit2_converged       = fit2_converged,
-  loo_comparison       = comparison,
-  r2_fit1_marginal     = r2_fit1_marginal,
-  r2_fit1_conditional  = r2_fit1_conditional,
-  r2_fit2_marginal     = r2_fit2_marginal,
-  r2_fit2_conditional  = r2_fit2_conditional,
-  interaction_summary  = interaction_summary,
-  interaction_pd       = interaction_pd
+  fit0 = fit0,
+  fit1 = fit1,
+  fit2 = fit2,
+  icc0 = icc(fit0),
+  comparison = comparison,
+  r2_pseudo = r2_pseudo(fit2, fit1)
 )
-saveRDS(results, file.path(FITS_DIR, "results_summary.rds"))
+saveRDS(results, "analysis/fits/results_summary.rds")
 
 sink()
-cat(sprintf("\nDone. Log written to %s, fitted models saved to %s/\n", LOG_FILE, FITS_DIR))
+cat(sprintf("\nDone. Log written to %s\n", LOG_FILE))

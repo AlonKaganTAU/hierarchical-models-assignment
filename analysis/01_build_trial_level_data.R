@@ -16,7 +16,7 @@ OUT_CSV   <- "data/trial_level.csv"
 # K computation and trial-pairing logic, but keeps all 35 subjects (no
 # understood/felt exclusion) and returns trial-level data rather than
 # per-subject WSLS betas, since the assignment models the trial-level DV
-# directly with reward x K as a cross-level interaction.
+# directly with reward_oneback x K as a cross-level interaction.
 
 #### WM CAPACITY (K) PER SUBJECT ####
 wm_files <- list.files(DATA_WM, pattern = "^ioc-wm_[a-f0-9]{24}_SESSION.*\\.csv$", full.names = TRUE)
@@ -64,7 +64,7 @@ df <- df_raw |>
   ungroup() |>
   filter(is_choice_valid, valid_prev, !is.na(reward_prev)) |>
   mutate(stay = as.integer(choice_key == choice_prev)) |>
-  select(participant, block_number, trial_number, reward = reward_prev, stay)
+  select(participant, block_number, trial_number, reward_oneback = reward_prev, stay)
 
 #### MERGE WITH WM CAPACITY ####
 df <- df |>
@@ -83,7 +83,7 @@ cat(sprintf("Trials per subject: min = %d, max = %d, mean = %.1f\n",
 cat(sprintf("K range: %.2f to %.2f, missing = %d\n",
             min(wm$K, na.rm = TRUE), max(wm$K, na.rm = TRUE), sum(is.na(wm$K))))
 
-cat(sprintf("Missing reward/stay in final data: %d\n", sum(is.na(df$reward) | is.na(df$stay))))
+cat(sprintf("Missing reward_oneback/stay in final data: %d\n", sum(is.na(df$reward_oneback) | is.na(df$stay))))
 
 #### WRITE OUTPUT ####
 write_csv(df, OUT_CSV)
