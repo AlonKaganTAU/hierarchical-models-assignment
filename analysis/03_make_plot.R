@@ -24,13 +24,13 @@ k_sd <- sd(k_subject$K_c)
 # instead of extracting a data frame by hand.
 plt_A <- plot_predictions(
   fit2,
-  condition = list("reward_oneback", K_c = c(-k_sd, k_sd)),
+  condition = list("reward_oneback", K_c = c(-k_sd, 0, k_sd)),
   re.form = NA
 ) +
   scale_color_manual(
     "K",
-    values = c("#E69F00", "#0072B2"),
-    labels = c("-1 SD K", "+1 SD K"),
+    values = c("#E69F00", "#666666", "#0072B2"),
+    labels = c("-1 SD K", "Mean K", "+1 SD K"),
     aesthetics = c("fill", "color")
   ) +
   labs(x = "Previous-trial reward", y = "P(stay)", title = "Model-implied WSLS effect") +
