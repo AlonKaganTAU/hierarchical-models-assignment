@@ -51,9 +51,9 @@ fit1 <- glmer(
   family = binomial(link = "logit"),
   data = df
 )
-cat(sprintf("Model 1 singular: %s | converged: %s\n", isSingular(fit1), is.null(fit1@optinfo$conv$lme4$messages)))
+cat(sprintf("Model 1 singular: %s | converged: %s\n", check_singularity(fit1), is.null(fit1@optinfo$conv$lme4$messages)))
 
-if (isSingular(fit1) || !is.null(fit1@optinfo$conv$lme4$messages)) {
+if (check_singularity(fit1) || !is.null(fit1@optinfo$conv$lme4$messages)) {
   cat("Retrying Model 1 with glmerControl(calc.derivs = FALSE)...\n")
   fit1 <- glmer(
     stay ~ reward_oneback + (reward_oneback | participant),
@@ -62,7 +62,7 @@ if (isSingular(fit1) || !is.null(fit1@optinfo$conv$lme4$messages)) {
     control = glmerControl(calc.derivs = FALSE)
   )
 }
-if (isSingular(fit1) || !is.null(fit1@optinfo$conv$lme4$messages)) {
+if (check_singularity(fit1) || !is.null(fit1@optinfo$conv$lme4$messages)) {
   cat("Retrying Model 1 with the bobyqa optimizer...\n")
   fit1 <- glmer(
     stay ~ reward_oneback + (reward_oneback | participant),
@@ -71,7 +71,7 @@ if (isSingular(fit1) || !is.null(fit1@optinfo$conv$lme4$messages)) {
     control = glmerControl("bobyqa")
   )
 }
-if (isSingular(fit1) || !is.null(fit1@optinfo$conv$lme4$messages)) {
+if (check_singularity(fit1) || !is.null(fit1@optinfo$conv$lme4$messages)) {
   cat("Retrying Model 1 dropping the random intercept-slope correlation (||)...\n")
   fit1 <- glmer(
     stay ~ reward_oneback + (reward_oneback || participant),
@@ -88,9 +88,9 @@ fit2 <- glmer(
   family = binomial(link = "logit"),
   data = df
 )
-cat(sprintf("Model 2 singular: %s | converged: %s\n", isSingular(fit2), is.null(fit2@optinfo$conv$lme4$messages)))
+cat(sprintf("Model 2 singular: %s | converged: %s\n", check_singularity(fit2), is.null(fit2@optinfo$conv$lme4$messages)))
 
-if (isSingular(fit2) || !is.null(fit2@optinfo$conv$lme4$messages)) {
+if (check_singularity(fit2) || !is.null(fit2@optinfo$conv$lme4$messages)) {
   cat("Retrying Model 2 with glmerControl(calc.derivs = FALSE)...\n")
   fit2 <- glmer(
     stay ~ reward_oneback * K_c + (reward_oneback | participant),
@@ -99,7 +99,7 @@ if (isSingular(fit2) || !is.null(fit2@optinfo$conv$lme4$messages)) {
     control = glmerControl(calc.derivs = FALSE)
   )
 }
-if (isSingular(fit2) || !is.null(fit2@optinfo$conv$lme4$messages)) {
+if (check_singularity(fit2) || !is.null(fit2@optinfo$conv$lme4$messages)) {
   cat("Retrying Model 2 with the bobyqa optimizer...\n")
   fit2 <- glmer(
     stay ~ reward_oneback * K_c + (reward_oneback | participant),
@@ -108,7 +108,7 @@ if (isSingular(fit2) || !is.null(fit2@optinfo$conv$lme4$messages)) {
     control = glmerControl("bobyqa")
   )
 }
-if (isSingular(fit2) || !is.null(fit2@optinfo$conv$lme4$messages)) {
+if (check_singularity(fit2) || !is.null(fit2@optinfo$conv$lme4$messages)) {
   cat("Retrying Model 2 dropping the random intercept-slope correlation (||)...\n")
   fit2 <- glmer(
     stay ~ reward_oneback * K_c + (reward_oneback || participant),

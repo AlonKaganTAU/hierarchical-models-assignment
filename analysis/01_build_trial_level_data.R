@@ -4,7 +4,6 @@ rm(list = ls())
 library(dplyr)
 library(tidyr)
 library(readr)
-library(purrr)
 library(stringr)
 
 DATA_TASK <- "data/raw/task"
@@ -21,35 +20,31 @@ OUT_CSV   <- "data/trial_level.csv"
 #### WM CAPACITY (K) PER SUBJECT ####
 wm_files <- list.files(DATA_WM, pattern = "^ioc-wm_[a-f0-9]{24}_SESSION.*\\.csv$", full.names = TRUE)
 
-wm <- wm_files |>
-  map(\(f) {
-    pid <- str_extract(f, "[a-f0-9]{24}")
-    exp <- read_csv(f, show_col_types = FALSE, col_types = cols(.default = col_character())) |>
-      filter(trial_name == "test_squares", block_type == "exp") |>
-      mutate(set_size = as.numeric(set_size),
-             acc_bool = tolower(accuracy) == "true")
+wm <- do.call(rbind, lapply(wm_files, function(f) {
+  pid <- str_extract(f, "[a-f0-9]{24}")
+  exp <- read.csv(f, colClasses = "character") |>
+    filter(trial_name == "test_squares", block_type == "exp") |>
+    mutate(set_size = as.numeric(set_size),
+           acc_bool = tolower(accuracy) == "true")
 
-    k_by_set_size <- map_dbl(c(4, 8), \(ss) {
-      t <- exp |> filter(set_size == ss)
-      d <- t |> filter(condition == "d")
-      s <- t |> filter(condition == "s")
-      if (nrow(d) == 0 || nrow(s) == 0) return(NA_real_)
-      ss * (mean(d$acc_bool) + mean(s$acc_bool) - 1)
-    })
-    tibble(participant = pid, K = mean(k_by_set_size, na.rm = TRUE))
-  }) |>
-  list_rbind()
+  k_by_set_size <- sapply(c(4, 8), function(ss) {
+    t <- exp |> filter(set_size == ss)
+    d <- t |> filter(condition == "d")
+    s <- t |> filter(condition == "s")
+    if (nrow(d) == 0 || nrow(s) == 0) return(NA_real_)
+    ss * (mean(d$acc_bool) + mean(s$acc_bool) - 1)
+  })
+  tibble(participant = pid, K = mean(k_by_set_size, na.rm = TRUE))
+}))
 
 #### TRIAL-LEVEL STAY / REWARD PAIRS ####
 task_files <- list.files(DATA_TASK, pattern = "^ioc-all_[a-f0-9]{24}_SESSION.*\\.csv$", full.names = TRUE)
 
-df_raw <- task_files |>
-  map(\(f) {
-    pid <- str_extract(f, "[a-f0-9]{24}")
-    read_csv(f, show_col_types = FALSE, col_types = cols(.default = col_character())) |>
-      mutate(participant = pid)
-  }) |>
-  list_rbind()
+df_raw <- do.call(rbind, lapply(task_files, function(f) {
+  pid <- str_extract(f, "[a-f0-9]{24}")
+  read.csv(f, colClasses = "character") |>
+    mutate(participant = pid)
+}))
 
 df <- df_raw |>
   filter(task == "gambling_choice", block_number != "training") |>
