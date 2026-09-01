@@ -38,5 +38,5 @@ plt <- plot_predictions(
   theme(panel.grid.minor = element_blank(), legend.position = "bottom",
         plot.title = element_text(size = 11))
 
-ggsave(OUT_PNG, plt, width = 3.75, height = 3, dpi = 96, bg = "white")
+ggsave(OUT_PNG, plt, width = 4.5, height = 3.3, dpi = 300, bg = "white")
 cat(sprintf("Saved -> %s\n", OUT_PNG))
