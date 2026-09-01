@@ -20,9 +20,8 @@ k_participant <- unique(df[c("participant", "K_c")])
 k_sd <- sd(k_participant$K_c)
 
 #### PANEL A: model-implied predictions ####
-# Let plot_predictions() draw the figure directly and add layers on top, as
-# in every course example (week 3's own +-1 SD moderator plot, week 6's GLMM
-# plot_predictions() usage), instead of extracting a data frame by hand.
+# Let plot_predictions() draw the figure directly and add layers on top,
+# instead of extracting a data frame by hand.
 plt_A <- plot_predictions(
   fit2,
   condition = list("reward_oneback", K_c = c(-k_sd, k_sd)),
@@ -40,14 +39,10 @@ plt_A <- plot_predictions(
         plot.title = element_text(size = 11))
 
 #### PANEL B: each participant's own observed WSLS effect against their K ####
-# Mirrors GLMM.R's own precedent for visualizing a Level-2 moderator against a
-# subject-level outcome: ggplot(SFON_data, aes(weberFr, Attend)) +
-# stat_summary(aes(group = ID), geom = "point"). Our outcome is a within-
-# subject contrast (P(stay) after reward minus after no reward) rather than a
-# single proportion, so it is computed with group_by()/summarise() first and
-# then plotted the same way, with a plain OLS reference line (geom_smooth(
-# method = "lm", se = FALSE)) matching the course's BLUP-scatter convention
-# (Ex3solution.R) rather than a model-based band.
+# Each participant's own WSLS effect (a within-subject contrast: P(stay)
+# after reward minus after no reward) is computed with group_by()/
+# summarise() first, then plotted with a plain OLS reference line rather
+# than a model-based band.
 participant_wsls_effects <- df |>
   group_by(participant, K) |>
   summarise(
@@ -65,8 +60,7 @@ plt_B <- ggplot(participant_wsls_effects, aes(K, wsls_effect)) +
   theme(panel.grid.minor = element_blank())
 
 #### COMBINE ####
-# plot_layout(guides = "collect") merges the shared legend, matching the
-# course's own patchwork usage (week 7).
+# plot_layout(guides = "collect") merges the shared legend.
 plt <- plt_A + plt_B + plot_layout(guides = "collect")
 
 ggsave(OUT_PNG, plt, width = 8, height = 3.5, dpi = 300, bg = "white")

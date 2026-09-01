@@ -8,13 +8,9 @@ library(performance)
 library(parameters)
 library(marginaleffects)
 
-# r2_pseudo(): course helper for the proportional reduction in a random-effect
-# variance component between two nested models (used for GLMM effect sizes,
-# since performance::r2()/r2_nakagawa() are not used for GLMMs in this course).
-# Later course versions ship this in the MSBMisc package / a sourced
-# helpers.R (both now unreachable: r-universe.dev and github.com are blocked
-# by this sandbox's network policy), so it is inlined here verbatim from the
-# course's own week-3 script, where it is given as a local function.
+# r2_pseudo(): proportional reduction in a random-effect variance component
+# between two nested models, used for GLMM effect sizes since
+# performance::r2()/r2_nakagawa() are not defined for GLMMs.
 r2_pseudo <- function(mf, mr, mnull = mr) {
   V_table <- function(model) {
     as_tibble(VarCorr(model)) |>
@@ -178,9 +174,8 @@ tryCatch({
   print(avg_comparisons(fit2, variables = "reward_oneback", comparison = "lnor", transform = "exp"))
 
   #### ROBUSTNESS: block-within-participant grouping (Model 2, three levels) ####
-  # Trials come in six blocks per person; add a grouping factor for block
-  # within participant (multiple random grouping variables, week 7 syntax:
-  # (1 | childid:schoolid)) to see whether the interaction survives once
+  # Trials come in six blocks per person; add a nested grouping factor for
+  # block within participant to see whether the interaction survives once
   # within-session drift gets its own variance term.
   cat("\n#### Model 2 with an added (1 | participant:block_number) term ####\n")
   fit2_block <- glmer(
