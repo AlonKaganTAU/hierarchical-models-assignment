@@ -4,6 +4,7 @@ rm(list = ls())
 library(dplyr)
 library(marginaleffects)
 library(ggplot2)
+library(patchwork)
 
 FITS_DIR <- "analysis/fits"
 OUT_PNG  <- "analysis/figures/simple_slopes.png"
@@ -18,10 +19,11 @@ df   <- read.csv("data/trial_level.csv")
 k_participant <- unique(df[c("participant", "K_c")])
 k_sd <- sd(k_participant$K_c)
 
+#### PANEL A: model-implied predictions ####
 # Let plot_predictions() draw the figure directly and add layers on top, as
 # in every course example (week 3's own +-1 SD moderator plot, week 6's GLMM
 # plot_predictions() usage), instead of extracting a data frame by hand.
-plt <- plot_predictions(
+plt_A <- plot_predictions(
   fit2,
   condition = list("reward_oneback", K_c = c(-k_sd, k_sd)),
   re.form = NA
@@ -32,11 +34,40 @@ plt <- plot_predictions(
     labels = c("-1 SD K", "+1 SD K"),
     aesthetics = c("fill", "color")
   ) +
-  labs(x = "Previous-trial reward", y = "P(stay)",
-       title = "Reward effect by working memory capacity") +
+  labs(x = "Previous-trial reward", y = "P(stay)", title = "Model-implied") +
   theme_minimal(base_size = 12) +
   theme(panel.grid.minor = element_blank(), legend.position = "bottom",
         plot.title = element_text(size = 11))
 
-ggsave(OUT_PNG, plt, width = 4.5, height = 3.3, dpi = 300, bg = "white")
+#### PANEL B: each participant's own observed reward effect against their K ####
+# Mirrors GLMM.R's own precedent for visualizing a Level-2 moderator against a
+# subject-level outcome: ggplot(SFON_data, aes(weberFr, Attend)) +
+# stat_summary(aes(group = ID), geom = "point"). Our outcome is a within-
+# subject contrast (P(stay) after reward minus after no reward) rather than a
+# single proportion, so it is computed with group_by()/summarise() first and
+# then plotted the same way, with a plain OLS reference line (geom_smooth(
+# method = "lm", se = FALSE)) matching the course's BLUP-scatter convention
+# (Ex3solution.R) rather than a model-based band.
+participant_effects <- df |>
+  group_by(participant, K) |>
+  summarise(
+    effect = mean(stay[reward_oneback == 1]) - mean(stay[reward_oneback == 0]),
+    .groups = "drop"
+  )
+
+plt_B <- ggplot(participant_effects, aes(K, effect)) +
+  geom_point() +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(x = "Working memory capacity (K)", y = "Observed reward effect",
+       title = "Observed, by participant") +
+  theme_minimal(base_size = 12) +
+  theme(panel.grid.minor = element_blank())
+
+#### COMBINE ####
+# plot_layout(guides = "collect") merges the shared legend, matching the
+# course's own patchwork usage (week 7).
+plt <- plt_A + plt_B + plot_layout(guides = "collect")
+
+ggsave(OUT_PNG, plt, width = 8, height = 3.5, dpi = 300, bg = "white")
 cat(sprintf("Saved -> %s\n", OUT_PNG))
