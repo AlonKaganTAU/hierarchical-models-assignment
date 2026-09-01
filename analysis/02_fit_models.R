@@ -173,18 +173,6 @@ tryCatch({
   cat("\n#### Model 2: average odds ratio for reward_oneback ####\n")
   print(avg_comparisons(fit2, variables = "reward_oneback", comparison = "lnor", transform = "exp"))
 
-  #### ROBUSTNESS: block-within-subject grouping (Model 2, three levels) ####
-  # Trials come in six blocks per person; add a nested grouping factor for
-  # block within subject to see whether the interaction survives once
-  # within-session drift gets its own variance term.
-  cat("\n#### Model 2 with an added (1 | subject:block_number) term ####\n")
-  fit2_block <- glmer(
-    stay ~ reward_oneback * K_c + (reward_oneback | subject) + (1 | subject:block_number),
-    family = binomial(link = "logit"),
-    data = df
-  )
-  print(model_parameters(fit2_block, exponentiate = TRUE))
-
   #### CONVERGENCE / SINGULARITY SUMMARY ####
   cat("\n#### Convergence diagnostics ####\n")
   cat(sprintf("Model 1 singular: %s\n", check_singularity(fit1)))
@@ -197,7 +185,6 @@ tryCatch({
     fit0 = fit0,
     fit1 = fit1,
     fit2 = fit2,
-    fit2_block = fit2_block,
     icc0 = icc(fit0),
     comparison = comparison,
     r2_pseudo = r2_pseudo(fit2, fit1)
