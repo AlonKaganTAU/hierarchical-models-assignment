@@ -11,7 +11,30 @@ library(marginaleffects)
 # r2_pseudo(): course helper for the proportional reduction in a random-effect
 # variance component between two nested models (used for GLMM effect sizes,
 # since performance::r2()/r2_nakagawa() are not used for GLMMs in this course).
-source("https://github.com/mattansb/Hierarchical-Linear-Models-foR-Psychologists/raw/refs/heads/main/helpers.R")
+# Later course versions ship this in the MSBMisc package / a sourced
+# helpers.R (both now unreachable: r-universe.dev and github.com are blocked
+# by this sandbox's network policy), so it is inlined here verbatim from the
+# course's own week-3 script, where it is given as a local function.
+r2_pseudo <- function(mf, mr, mnull = mr) {
+  V_table <- function(model) {
+    as_tibble(VarCorr(model)) |>
+      filter(is.na(var2)) |>
+      select(-sdcor, -var2) |>
+      rename(var = var1)
+  }
+
+  V_full <- V_table(mf)
+  V_restricted <- V_table(mr)
+  V_empty <- V_table(mnull)
+
+  V_full |>
+    inner_join(V_restricted, by = c("grp", "var")) |>
+    inner_join(V_empty, by = c("grp", "var")) |>
+    mutate(
+      r2 = (vcov.y - vcov.x) / vcov,
+    ) |>
+    select(grp, var, r2)
+}
 
 DATA_CSV <- "data/trial_level.csv"
 LOG_FILE <- "analysis/model_log.txt"

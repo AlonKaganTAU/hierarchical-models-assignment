@@ -26,15 +26,11 @@ plt <- plot_predictions(
   condition = list("reward_oneback", K_c = c(-k_sd, k_sd)),
   re.form = NA
 ) +
-  scale_colour_manual(
+  scale_color_manual(
+    "K",
     values = c("#E69F00", "#0072B2"),
     labels = c("-1 SD K", "+1 SD K"),
-    name = NULL
-  ) +
-  scale_fill_manual(
-    values = c("#E69F00", "#0072B2"),
-    labels = c("-1 SD K", "+1 SD K"),
-    name = NULL
+    aesthetics = c("fill", "color")
   ) +
   labs(x = "Previous-trial reward", y = "P(stay)",
        title = "Reward effect by working memory capacity") +
