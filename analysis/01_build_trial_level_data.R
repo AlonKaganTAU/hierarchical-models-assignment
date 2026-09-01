@@ -5,6 +5,7 @@ library(dplyr)
 library(tidyr)
 library(readr)
 library(stringr)
+library(datawizard)
 
 DATA_TASK <- "data/raw/task"
 DATA_WM   <- "data/raw/wm"
@@ -48,8 +49,8 @@ df_raw <- do.call(rbind, lapply(task_files, function(f) {
 
 df <- df_raw |>
   filter(task == "gambling_choice", block_number != "training") |>
-  mutate(trial_number   = as.numeric(trial_number),
-         reward         = as.numeric(reward),
+  mutate(trial_number    = as.numeric(trial_number),
+         reward          = as.numeric(reward),
          is_choice_valid = as.logical(is_choice_valid)) |>
   arrange(participant, block_number, trial_number) |>
   group_by(participant, block_number) |>
@@ -58,14 +59,36 @@ df <- df_raw |>
          reward_prev       = lag(reward)) |>
   ungroup() |>
   filter(is_choice_valid, valid_prev, !is.na(reward_prev)) |>
-  mutate(stay = as.integer(choice_key == choice_prev)) |>
+  mutate(stay = as.integer(choice_key == choice_prev))
+
+#### VALIDATE LAG-DERIVED VALUES AGAINST THE RAW *_oneback COLUMNS ####
+# The raw files also ship choice_key_oneback/reward_oneback columns, but these
+# run across block boundaries (e.g. block 1 trial 1's reward_oneback is
+# actually carried over from the training block), so they are not what we
+# want as the predictor -- our own group_by(block)-then-lag() correctly
+# resets to NA at each block's first trial. We only use the raw columns here
+# to sanity-check agreement on the trials where both are defined (i.e. not
+# each block's first trial, which we already dropped above).
+choice_mismatch <- sum(df$choice_prev != df$choice_key_oneback, na.rm = TRUE)
+reward_mismatch <- sum(df$reward_prev != as.numeric(df$reward_oneback), na.rm = TRUE)
+cat(sprintf("Lag-derived vs. raw *_oneback mismatches: choice = %d, reward = %d (of %d rows)\n",
+            choice_mismatch, reward_mismatch, nrow(df)))
+
+df <- df |>
   select(participant, block_number, trial_number, reward_oneback = reward_prev, stay)
 
 #### MERGE WITH WM CAPACITY ####
-df <- df |>
+# Centre K on the analysis sample (one row per participant), not on the
+# trial-level frame -- K is repeated once per trial, so centring after the
+# join to df would weight the mean by each participant's trial count rather
+# than treating each participant equally.
+subjects <- tibble(participant = unique(df$participant)) |>
   inner_join(wm, by = "participant") |>
   filter(!is.na(K)) |>
-  mutate(K_c = K - mean(wm$K, na.rm = TRUE))
+  mutate(K_c = center(K))
+
+df <- df |>
+  inner_join(subjects, by = "participant")
 
 #### SANITY CHECKS ####
 n_subjects <- n_distinct(df$participant)
@@ -75,8 +98,9 @@ trials_per_subject <- df |> count(participant, name = "n_trials")
 cat(sprintf("Trials per subject: min = %d, max = %d, mean = %.1f\n",
             min(trials_per_subject$n_trials), max(trials_per_subject$n_trials), mean(trials_per_subject$n_trials)))
 
-cat(sprintf("K range: %.2f to %.2f, missing = %d\n",
-            min(wm$K, na.rm = TRUE), max(wm$K, na.rm = TRUE), sum(is.na(wm$K))))
+cat(sprintf("K (analysis sample, one value per subject): range %.2f to %.2f, mean %.2f, SD %.2f\n",
+            min(subjects$K), max(subjects$K), mean(subjects$K), sd(subjects$K)))
+cat(sprintf("K_c mean over subjects (should be 0): %.12f\n", mean(subjects$K_c)))
 
 cat(sprintf("Missing reward_oneback/stay in final data: %d\n", sum(is.na(df$reward_oneback) | is.na(df$stay))))
 

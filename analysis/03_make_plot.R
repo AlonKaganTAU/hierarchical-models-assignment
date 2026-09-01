@@ -13,25 +13,29 @@ results <- readRDS(file.path(FITS_DIR, "results_summary.rds"))
 fit2 <- results$fit2
 df   <- read.csv("data/trial_level.csv")
 
-k_sd <- sd(df$K)
+# K_c is constant within a participant (repeated once per trial), so its SD
+# must be computed over the 35 subjects, not over all 5,025 trial rows.
+k_participant <- unique(df[c("participant", "K_c")])
+k_sd <- sd(k_participant$K_c)
 
-# Population-average predictions (re.form = NA) at -1 SD/+1 SD of K, matching
-# the course's plot_predictions() workflow for GLMMs.
-p <- plot_predictions(
+# Let plot_predictions() draw the figure directly and add layers on top, as
+# in every course example (week 3's own +-1 SD moderator plot, week 6's GLMM
+# plot_predictions() usage), instead of extracting a data frame by hand.
+plt <- plot_predictions(
   fit2,
-  condition = list(
-    reward_oneback = c(0, 1),
-    K_c = c(-k_sd, k_sd)
-  ),
-  re.form = NA,
-  draw = FALSE
-) |>
-  mutate(K_level = factor(K_c, levels = c(-k_sd, k_sd), labels = c("-1 SD K", "+1 SD K")))
-
-plt <- ggplot(p, aes(x = factor(reward_oneback), y = estimate, group = K_level, colour = K_level)) +
-  geom_line(linewidth = 1) +
-  geom_pointrange(aes(ymin = conf.low, ymax = conf.high), size = 0.6) +
-  scale_colour_manual(values = c("-1 SD K" = "#E69F00", "+1 SD K" = "#0072B2"), name = NULL) +
+  condition = list("reward_oneback", K_c = c(-k_sd, k_sd)),
+  re.form = NA
+) +
+  scale_colour_manual(
+    values = c("#E69F00", "#0072B2"),
+    labels = c("-1 SD K", "+1 SD K"),
+    name = NULL
+  ) +
+  scale_fill_manual(
+    values = c("#E69F00", "#0072B2"),
+    labels = c("-1 SD K", "+1 SD K"),
+    name = NULL
+  ) +
   labs(x = "Previous-trial reward", y = "P(stay)",
        title = "Reward effect by working memory capacity") +
   theme_minimal(base_size = 12) +
