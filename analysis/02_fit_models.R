@@ -45,9 +45,9 @@ sink(log_con, split = TRUE)
 tryCatch({
 
   df <- read.csv(DATA_CSV) |>
-    mutate(participant = factor(participant))
+    mutate(subject = factor(subject))
 
-  cat(sprintf("Loaded %d trials from %d subjects.\n\n", nrow(df), n_distinct(df$participant)))
+  cat(sprintf("Loaded %d trials from %d subjects.\n\n", nrow(df), n_distinct(df$subject)))
 
   #### CHECK HETEROGENEITY OF reward_oneback (is it worth splitting WP/BP?) ####
   # Same logic as the course's within-person-fluctuation check: treat the
@@ -57,16 +57,16 @@ tryCatch({
   # models uncentred/unsplit.
   cat("#### Checking reward_oneback's own ICC (justifies leaving it unsplit) ####\n")
   fit_reward_icc <- glmer(
-    reward_oneback ~ 1 + (1 | participant),
+    reward_oneback ~ 1 + (1 | subject),
     family = binomial(link = "logit"),
     data = df
   )
   print(icc(fit_reward_icc))
 
   #### MODEL 0 — empty (unconditional), for the ICC ####
-  cat("#### Fitting Model 0: stay ~ 1 + (1 | participant) ####\n")
+  cat("#### Fitting Model 0: stay ~ 1 + (1 | subject) ####\n")
   fit0 <- glmer(
-    stay ~ 1 + (1 | participant),
+    stay ~ 1 + (1 | subject),
     family = binomial(link = "logit"),
     data = df
   )
@@ -82,9 +82,9 @@ tryCatch({
   # to converge, apply the remedies in the order taught (control tweaks, then
   # optimizer, then dropping only the random *correlation* via || - never
   # dropping a random slope/intercept outright).
-  cat("\n#### Fitting Model 1 (maximal RE): stay ~ reward_oneback + (reward_oneback | participant) ####\n")
+  cat("\n#### Fitting Model 1 (maximal RE): stay ~ reward_oneback + (reward_oneback | subject) ####\n")
   fit1 <- glmer(
-    stay ~ reward_oneback + (reward_oneback | participant),
+    stay ~ reward_oneback + (reward_oneback | subject),
     family = binomial(link = "logit"),
     data = df
   )
@@ -93,7 +93,7 @@ tryCatch({
   if (check_singularity(fit1) || !is.null(fit1@optinfo$conv$lme4$messages)) {
     cat("Retrying Model 1 with glmerControl(calc.derivs = FALSE)...\n")
     fit1 <- glmer(
-      stay ~ reward_oneback + (reward_oneback | participant),
+      stay ~ reward_oneback + (reward_oneback | subject),
       family = binomial(link = "logit"),
       data = df,
       control = glmerControl(calc.derivs = FALSE)
@@ -102,7 +102,7 @@ tryCatch({
   if (check_singularity(fit1) || !is.null(fit1@optinfo$conv$lme4$messages)) {
     cat("Retrying Model 1 with the bobyqa optimizer...\n")
     fit1 <- glmer(
-      stay ~ reward_oneback + (reward_oneback | participant),
+      stay ~ reward_oneback + (reward_oneback | subject),
       family = binomial(link = "logit"),
       data = df,
       control = glmerControl("bobyqa")
@@ -111,7 +111,7 @@ tryCatch({
   if (check_singularity(fit1) || !is.null(fit1@optinfo$conv$lme4$messages)) {
     cat("Retrying Model 1 dropping the random intercept-slope correlation (||)...\n")
     fit1 <- glmer(
-      stay ~ reward_oneback + (reward_oneback || participant),
+      stay ~ reward_oneback + (reward_oneback || subject),
       family = binomial(link = "logit"),
       data = df
     )
@@ -119,9 +119,9 @@ tryCatch({
   print(model_parameters(fit1, exponentiate = TRUE))
 
   #### MODEL 2 — reward_oneback x K_c cross-level interaction (key model) ####
-  cat("\n#### Fitting Model 2 (maximal RE): stay ~ reward_oneback * K_c + (reward_oneback | participant) ####\n")
+  cat("\n#### Fitting Model 2 (maximal RE): stay ~ reward_oneback * K_c + (reward_oneback | subject) ####\n")
   fit2 <- glmer(
-    stay ~ reward_oneback * K_c + (reward_oneback | participant),
+    stay ~ reward_oneback * K_c + (reward_oneback | subject),
     family = binomial(link = "logit"),
     data = df
   )
@@ -130,7 +130,7 @@ tryCatch({
   if (check_singularity(fit2) || !is.null(fit2@optinfo$conv$lme4$messages)) {
     cat("Retrying Model 2 with glmerControl(calc.derivs = FALSE)...\n")
     fit2 <- glmer(
-      stay ~ reward_oneback * K_c + (reward_oneback | participant),
+      stay ~ reward_oneback * K_c + (reward_oneback | subject),
       family = binomial(link = "logit"),
       data = df,
       control = glmerControl(calc.derivs = FALSE)
@@ -139,7 +139,7 @@ tryCatch({
   if (check_singularity(fit2) || !is.null(fit2@optinfo$conv$lme4$messages)) {
     cat("Retrying Model 2 with the bobyqa optimizer...\n")
     fit2 <- glmer(
-      stay ~ reward_oneback * K_c + (reward_oneback | participant),
+      stay ~ reward_oneback * K_c + (reward_oneback | subject),
       family = binomial(link = "logit"),
       data = df,
       control = glmerControl("bobyqa")
@@ -148,7 +148,7 @@ tryCatch({
   if (check_singularity(fit2) || !is.null(fit2@optinfo$conv$lme4$messages)) {
     cat("Retrying Model 2 dropping the random intercept-slope correlation (||)...\n")
     fit2 <- glmer(
-      stay ~ reward_oneback * K_c + (reward_oneback || participant),
+      stay ~ reward_oneback * K_c + (reward_oneback || subject),
       family = binomial(link = "logit"),
       data = df
     )
@@ -173,13 +173,13 @@ tryCatch({
   cat("\n#### Model 2: average odds ratio for reward_oneback ####\n")
   print(avg_comparisons(fit2, variables = "reward_oneback", comparison = "lnor", transform = "exp"))
 
-  #### ROBUSTNESS: block-within-participant grouping (Model 2, three levels) ####
+  #### ROBUSTNESS: block-within-subject grouping (Model 2, three levels) ####
   # Trials come in six blocks per person; add a nested grouping factor for
-  # block within participant to see whether the interaction survives once
+  # block within subject to see whether the interaction survives once
   # within-session drift gets its own variance term.
-  cat("\n#### Model 2 with an added (1 | participant:block_number) term ####\n")
+  cat("\n#### Model 2 with an added (1 | subject:block_number) term ####\n")
   fit2_block <- glmer(
-    stay ~ reward_oneback * K_c + (reward_oneback | participant) + (1 | participant:block_number),
+    stay ~ reward_oneback * K_c + (reward_oneback | subject) + (1 | subject:block_number),
     family = binomial(link = "logit"),
     data = df
   )

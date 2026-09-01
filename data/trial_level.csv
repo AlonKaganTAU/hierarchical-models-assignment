@@ -1,4 +1,4 @@
-participant,block_number,trial_number,reward_oneback,stay,K,K_c
+subject,block_number,trial_number,reward_oneback,stay,K,K_c
 5c41f9ce4fe4f800016dfaac,1,2,1,1,2.9966962755181545,1.15925169122991
 5c41f9ce4fe4f800016dfaac,1,3,1,0,2.9966962755181545,1.15925169122991
 5c41f9ce4fe4f800016dfaac,1,4,0,0,2.9966962755181545,1.15925169122991

@@ -35,7 +35,7 @@ wm <- do.call(rbind, lapply(wm_files, function(f) {
     if (nrow(d) == 0 || nrow(s) == 0) return(NA_real_)
     ss * (mean(d$acc_bool) + mean(s$acc_bool) - 1)
   })
-  tibble(participant = pid, K = mean(k_by_set_size, na.rm = TRUE))
+  tibble(subject = pid, K = mean(k_by_set_size, na.rm = TRUE))
 }))
 
 #### TRIAL-LEVEL STAY / REWARD PAIRS ####
@@ -44,7 +44,7 @@ task_files <- list.files(DATA_TASK, pattern = "^ioc-all_[a-f0-9]{24}_SESSION.*\\
 df_raw <- do.call(rbind, lapply(task_files, function(f) {
   pid <- str_extract(f, "[a-f0-9]{24}")
   read.csv(f, colClasses = "character") |>
-    mutate(participant = pid)
+    mutate(subject = pid)
 }))
 
 df <- df_raw |>
@@ -52,8 +52,8 @@ df <- df_raw |>
   mutate(trial_number    = as.numeric(trial_number),
          reward          = as.numeric(reward),
          is_choice_valid = as.logical(is_choice_valid)) |>
-  arrange(participant, block_number, trial_number) |>
-  group_by(participant, block_number) |>
+  arrange(subject, block_number, trial_number) |>
+  group_by(subject, block_number) |>
   mutate(choice_prev       = lag(choice_key),
          valid_prev        = lag(is_choice_valid),
          reward_prev       = lag(reward)) |>
@@ -75,26 +75,26 @@ cat(sprintf("Lag-derived vs. raw *_oneback mismatches: choice = %d, reward = %d 
             choice_mismatch, reward_mismatch, nrow(df)))
 
 df <- df |>
-  select(participant, block_number, trial_number, reward_oneback = reward_prev, stay)
+  select(subject, block_number, trial_number, reward_oneback = reward_prev, stay)
 
 #### MERGE WITH WM CAPACITY ####
-# Centre K on the analysis sample (one row per participant), not on the
+# Centre K on the analysis sample (one row per subject), not on the
 # trial-level frame -- K is repeated once per trial, so centring after the
-# join to df would weight the mean by each participant's trial count rather
-# than treating each participant equally.
-subjects <- tibble(participant = unique(df$participant)) |>
-  inner_join(wm, by = "participant") |>
+# join to df would weight the mean by each subject's trial count rather
+# than treating each subject equally.
+subjects <- tibble(subject = unique(df$subject)) |>
+  inner_join(wm, by = "subject") |>
   filter(!is.na(K)) |>
   mutate(K_c = center(K))
 
 df <- df |>
-  inner_join(subjects, by = "participant")
+  inner_join(subjects, by = "subject")
 
 #### SANITY CHECKS ####
-n_subjects <- n_distinct(df$participant)
+n_subjects <- n_distinct(df$subject)
 cat(sprintf("Subjects: %d\n", n_subjects))
 
-trials_per_subject <- df |> count(participant, name = "n_trials")
+trials_per_subject <- df |> count(subject, name = "n_trials")
 cat(sprintf("Trials per subject: min = %d, max = %d, mean = %.1f\n",
             min(trials_per_subject$n_trials), max(trials_per_subject$n_trials), mean(trials_per_subject$n_trials)))
 

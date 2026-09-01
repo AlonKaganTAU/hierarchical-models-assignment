@@ -14,10 +14,10 @@ results <- readRDS(file.path(FITS_DIR, "results_summary.rds"))
 fit2 <- results$fit2
 df   <- read.csv("data/trial_level.csv")
 
-# K_c is constant within a participant (repeated once per trial), so its SD
+# K_c is constant within a subject (repeated once per trial), so its SD
 # must be computed over the 35 subjects, not over all 5,025 trial rows.
-k_participant <- unique(df[c("participant", "K_c")])
-k_sd <- sd(k_participant$K_c)
+k_subject <- unique(df[c("subject", "K_c")])
+k_sd <- sd(k_subject$K_c)
 
 #### PANEL A: model-implied predictions ####
 # Let plot_predictions() draw the figure directly and add layers on top,
@@ -38,24 +38,24 @@ plt_A <- plot_predictions(
   theme(panel.grid.minor = element_blank(), legend.position = "bottom",
         plot.title = element_text(size = 11))
 
-#### PANEL B: each participant's own observed WSLS effect against their K ####
-# Each participant's own WSLS effect (a within-subject contrast: P(stay)
+#### PANEL B: each subject's own observed WSLS effect against their K ####
+# Each subject's own WSLS effect (a within-subject contrast: P(stay)
 # after reward minus after no reward) is computed with group_by()/
 # summarise() first, then plotted with a plain OLS reference line rather
 # than a model-based band.
-participant_wsls_effects <- df |>
-  group_by(participant, K) |>
+subject_wsls_effects <- df |>
+  group_by(subject, K) |>
   summarise(
     wsls_effect = mean(stay[reward_oneback == 1]) - mean(stay[reward_oneback == 0]),
     .groups = "drop"
   )
 
-plt_B <- ggplot(participant_wsls_effects, aes(K, wsls_effect)) +
+plt_B <- ggplot(subject_wsls_effects, aes(K, wsls_effect)) +
   geom_point() +
   geom_hline(yintercept = 0, linetype = "dashed") +
   geom_smooth(method = "lm", se = FALSE) +
   labs(x = "Working memory capacity (K)", y = "Observed WSLS effect",
-       title = "Observed, by participant") +
+       title = "Observed, by subject") +
   theme_minimal(base_size = 12) +
   theme(panel.grid.minor = element_blank())
 
