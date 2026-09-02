@@ -29,22 +29,29 @@ preds_A <- plot_predictions(
   draw = FALSE
 ) |>
   mutate(K_level = factor(K_c, levels = c(-k_sd, 0, k_sd),
-                           labels = c("-1 SD K", "Mean K", "+1 SD K")))
+                           labels = c("Low K (-1 SD)", "Mean K", "High K (+1 SD)")),
+         reward_lab = factor(reward_oneback, levels = c(0, 1),
+                              labels = c("No reward", "Reward")))
 
-plt_A <- ggplot(preds_A, aes(factor(reward_oneback), estimate, colour = K_level, group = K_level)) +
-  geom_line() +
-  geom_pointrange(aes(ymin = conf.low, ymax = conf.high)) +
-  scale_colour_manual("K", values = c("#E69F00", "#666666", "#0072B2")) +
-  labs(x = "Previous-trial reward", y = "P(stay)", title = "Model-implied WSLS effect") +
+plt_A <- ggplot(preds_A, aes(reward_lab, estimate, colour = K_level, group = K_level)) +
+  geom_line(position = position_dodge(width = 0.15)) +
+  geom_pointrange(aes(ymin = conf.low, ymax = conf.high), shape = 18, size = 0.8,
+                   position = position_dodge(width = 0.15)) +
+  scale_colour_manual(values = c("#E69F00", "#666666", "#0072B2")) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1), limits = c(0, 1)) +
+  labs(x = "Previous trial", y = "P(stay)") +
   theme_minimal(base_size = 12) +
-  theme(panel.grid.minor = element_blank(), legend.position = "bottom",
-        plot.title = element_text(size = 11))
+  theme(panel.grid.minor = element_blank(),
+        legend.title = element_blank(),
+        legend.position = c(0.02, 0.98),
+        legend.justification = c(0, 1),
+        legend.background = element_blank())
 
 #### PANEL B: each subject's own observed WSLS effect against their K ####
 # Each subject's own WSLS effect (a within-subject contrast: P(stay)
 # after reward minus after no reward) is computed with group_by()/
-# summarise() first, then plotted with a plain linear reference line rather
-# than a model-based band.
+# summarise() first, then plotted with a linear reference line and its
+# confidence band.
 subject_wsls_effects <- df |>
   group_by(subject, K) |>
   summarise(
@@ -53,20 +60,16 @@ subject_wsls_effects <- df |>
   )
 
 plt_B <- ggplot(subject_wsls_effects, aes(K, wsls_effect)) +
-  geom_point() +
-  geom_hline(yintercept = 0, linetype = "dashed") +
-  geom_smooth(method = "lm", se = FALSE) +
-  labs(x = "Working memory capacity (K)", y = "Observed WSLS effect",
-       title = "Observed, by subject") +
+  geom_hline(yintercept = 0, linetype = "dashed", colour = "grey50") +
+  geom_smooth(method = "lm", colour = "#0072B2", fill = "#0072B2") +
+  geom_point(colour = "grey30") +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  labs(x = "Working memory capacity (K)", y = "WSLS effect on P(stay)") +
   theme_minimal(base_size = 12) +
   theme(panel.grid.minor = element_blank())
 
 #### COMBINE ####
-# plot_layout(guides = "collect") merges the shared legend; the theme()
-# after "&" applies to the combined figure so the merged legend keeps
-# Panel A's bottom placement instead of defaulting to the right.
-plt <- (plt_A + plt_B + plot_layout(guides = "collect")) &
-  theme(legend.position = "bottom")
+plt <- (plt_A + plt_B) + plot_annotation(tag_levels = "A")
 
-ggsave(OUT_PNG, plt, width = 8, height = 3.5, dpi = 300, bg = "white")
+ggsave(OUT_PNG, plt, width = 9, height = 4, dpi = 300, bg = "white")
 cat(sprintf("Saved -> %s\n", OUT_PNG))
