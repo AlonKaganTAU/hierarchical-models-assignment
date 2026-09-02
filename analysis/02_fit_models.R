@@ -119,6 +119,9 @@ tryCatch({
       data = df
     )
   }
+  # Log-odds are the scale reported in Table 1; the odds ratios are what the
+  # text interprets.
+  print(model_parameters(fit1))
   print(model_parameters(fit1, exponentiate = TRUE))
 
   #### MODEL 2 — reward_oneback x K_c cross-level interaction (key model) ####
@@ -156,7 +159,7 @@ tryCatch({
       data = df
     )
   }
-  print(model_parameters(fit2, exponentiate = TRUE))
+  print(model_parameters(fit2))
 
   #### MODEL COMPARISON: Model 1 vs Model 2 ####
   cat("\n#### Model comparison (likelihood-ratio test; GLMMs are ML only, no refit needed) ####\n")
