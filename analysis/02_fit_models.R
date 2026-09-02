@@ -8,9 +8,6 @@ library(performance)
 library(parameters)
 library(marginaleffects)
 
-# r2_pseudo(): proportional reduction in a random-effect variance component
-# between two nested models, used for GLMM effect sizes since
-# performance::r2()/r2_nakagawa() are not defined for GLMMs.
 r2_pseudo <- function(mf, mr, mnull = mr) {
   V_table <- function(model) {
     as_tibble(VarCorr(model)) |>
@@ -50,11 +47,10 @@ tryCatch({
   cat(sprintf("Loaded %d trials from %d subjects.\n\n", nrow(df), n_distinct(df$subject)))
 
   #### CHECK HETEROGENEITY OF reward_oneback (is it worth splitting WP/BP?) ####
-  # Same logic as the course's within-person-fluctuation check: treat the
-  # Level 1 predictor as an outcome and fit an empty random-intercept model to
-  # get its between-person ICC. A near-zero ICC means there is no meaningful
-  # between-person variance to separate out, so reward_oneback can enter the
-  # models uncentred/unsplit.
+  # Treat the Level 1 predictor as an outcome and fit an empty random-intercept
+  # model to get its between-person ICC. A near-zero ICC means there is no
+  # meaningful between-person variance to separate out, so reward_oneback can
+  # enter the models uncentred/unsplit.
   cat("#### Checking reward_oneback's own ICC (justifies leaving it unsplit) ####\n")
   fit_reward_icc <- glmer(
     reward_oneback ~ 1 + (1 | subject),
@@ -80,8 +76,8 @@ tryCatch({
   cat(sprintf("\nLevel-1 variance is fixed by the logit link at pi^2/3 = %.4f\n", pi^2 / 3))
 
   #### MODEL 1 — reward_oneback only (baseline for the comparison) ####
-  # Maximal random-effects structure (Barr et al., 2013): random intercept and
-  # slope for reward_oneback, allowed to correlate. If this is singular or fails
+  # Maximal random-effects structure: random intercept and slope for
+  # reward_oneback, allowed to correlate. If this is singular or fails
   # to converge, apply the remedies in the order taught (control tweaks, then
   # optimizer, then dropping only the random *correlation* via || - never
   # dropping a random slope/intercept outright).
