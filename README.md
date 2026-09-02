@@ -1,4 +1,4 @@
-# Working Memory Capacity Moderates Automatic Reward-Driven Choice Under Known Non-Contingency
+# Working Memory Capacity and Automatic Reward-Driven Choice Under Known Non-Contingency
 
 Final assignment, Hierarchical Models (Tel Aviv University). Tests whether working
 memory capacity (K) moderates the win-stay lose-shift (WSLS) effect in an explicitly
@@ -23,13 +23,15 @@ binomial(link = "logit"), fitted with `glmer()`).
   random correlation via `||`), model comparison by likelihood-ratio test
   (`anova()`), and `r2_pseudo()` for the random-effect-variance effect size. Also
   reports reward_oneback's own (empty-model) ICC, justifying why it enters the
-  models unsplit into within-/between-person components, and a block-within-
-  subject robustness check (`(1 | subject:block_number)`). Writes
+  models unsplit into within-/between-person components, and the simple slopes of
+  the WSLS effect at -1 SD, the mean and +1 SD of K. Writes
   `analysis/model_log.txt` and caches fitted models to `analysis/fits/` (not
   tracked in git — rerun the script to regenerate).
-- `analysis/03_make_plot.R` — simple-slopes figure (`marginaleffects::plot_predictions()`,
-  chaining ggplot layers directly onto its output) used in the write-up. K's SD for
-  the ±1 SD probing values is computed over the 35 subjects, not the 5,025 trials.
+- `analysis/03_make_plot.R` — the two-panel Figure 1 used in the write-up: model-implied
+  predictions from `marginaleffects::plot_predictions(draw = FALSE)` (Panel A) and each
+  subject's own observed WSLS effect against their K (Panel B), combined with
+  `{patchwork}`. K's SD for the ±1 SD probing values is computed over the 35 subjects,
+  not the 5,025 trials.
 - `writeup/` — the submitted Word document.
 
 ## Reproducing

@@ -2,6 +2,9 @@ Loaded 5025 trials from 35 subjects.
 
 #### Checking reward_oneback's own ICC (justifies leaving it unsplit) ####
 [1] NA
+Singular fit: TRUE (the ICC above is NA because the between-subject variance is 0)
+ Groups  Name        Std.Dev.
+ subject (Intercept) 1e-06   
 #### Fitting Model 0: stay ~ 1 + (1 | subject) ####
 # Fixed Effects
 
@@ -108,6 +111,57 @@ Type:  response
  reward_oneback ln(odds(1) / odds(0))     2.61  0.00104 9.9  1.47   4.63
 
 Columns: term, contrast, estimate, p.value, s.value, conf.low, conf.high 
+Type:  response 
+
+
+#### Model 2: WSLS effect at -1 SD, mean and +1 SD of K_c (log-odds) ####
+
+           Term              Contrast   K_c Estimate Std. Error    z Pr(>|z|)
+ reward_oneback ln(odds(1) / odds(0)) -1.17    1.460      0.417 3.50   <0.001
+ reward_oneback ln(odds(1) / odds(0))  0.00    0.984      0.292 3.36   <0.001
+ reward_oneback ln(odds(1) / odds(0))  1.17    0.507      0.415 1.22    0.222
+    S  2.5 % 97.5 % reward_oneback                  subject
+ 11.1  0.642   2.28              1 5c41f9ce4fe4f800016dfaac
+ 10.3  0.411   1.56              1 5c41f9ce4fe4f800016dfaac
+  2.2 -0.307   1.32              1 5c41f9ce4fe4f800016dfaac
+
+Columns: rowid, term, contrast, estimate, std.error, statistic, p.value, s.value, conf.low, conf.high, K_c, predicted_lo, predicted_hi, predicted, stay, reward_oneback, subject 
+Type:  response 
+
+
+#### The same simple slopes, as odds ratios ####
+
+           Term              Contrast   K_c Estimate Pr(>|z|)    S 2.5 % 97.5 %
+ reward_oneback ln(odds(1) / odds(0)) -1.17     4.31   <0.001 11.1 1.900   9.76
+ reward_oneback ln(odds(1) / odds(0))  0.00     2.67   <0.001 10.3 1.508   4.74
+ reward_oneback ln(odds(1) / odds(0))  1.17     1.66    0.222  2.2 0.736   3.75
+ reward_oneback                  subject
+              1 5c41f9ce4fe4f800016dfaac
+              1 5c41f9ce4fe4f800016dfaac
+              1 5c41f9ce4fe4f800016dfaac
+
+Columns: rowid, term, contrast, estimate, p.value, s.value, conf.low, conf.high, K_c, predicted_lo, predicted_hi, predicted, stay, reward_oneback, subject 
+Type:  response 
+
+
+#### Model 2: predicted P(stay) at those K levels ####
+
+   K_c reward_oneback Estimate Std. Error    z Pr(>|z|)    S  2.5 % 97.5 %
+ -1.17              0    0.189     0.0478 3.96   <0.001 13.7 0.0955  0.283
+ -1.17              1    0.501     0.0915 5.48   <0.001 24.5 0.3218  0.680
+  0.00              0    0.247     0.0407 6.06   <0.001 29.5 0.1668  0.326
+  0.00              1    0.467     0.0637 7.33   <0.001 41.9 0.3418  0.591
+  1.17              0    0.315     0.0672 4.68   <0.001 18.4 0.1829  0.446
+  1.17              1    0.433     0.0892 4.85   <0.001 19.6 0.2577  0.607
+                  subject
+ 5c41f9ce4fe4f800016dfaac
+ 5c41f9ce4fe4f800016dfaac
+ 5c41f9ce4fe4f800016dfaac
+ 5c41f9ce4fe4f800016dfaac
+ 5c41f9ce4fe4f800016dfaac
+ 5c41f9ce4fe4f800016dfaac
+
+Columns: rowid, estimate, std.error, statistic, p.value, s.value, conf.low, conf.high, stay, subject, K_c, reward_oneback 
 Type:  response 
 
 

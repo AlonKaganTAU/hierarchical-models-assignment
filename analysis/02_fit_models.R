@@ -62,6 +62,9 @@ tryCatch({
     data = df
   )
   print(icc(fit_reward_icc))
+  cat(sprintf("Singular fit: %s (the ICC above is NA because the between-subject variance is 0)\n",
+              check_singularity(fit_reward_icc)))
+  print(VarCorr(fit_reward_icc))
 
   #### MODEL 0 — empty (unconditional), for the ICC ####
   cat("#### Fitting Model 0: stay ~ 1 + (1 | subject) ####\n")
@@ -172,6 +175,37 @@ tryCatch({
 
   cat("\n#### Model 2: average odds ratio for reward_oneback ####\n")
   print(avg_comparisons(fit2, variables = "reward_oneback", comparison = "lnor", transform = "exp"))
+
+  #### SIMPLE SLOPES: the WSLS effect at -1 SD, the mean, and +1 SD of K ####
+  # K_c is constant within a subject, so its SD is taken over the 35 subjects
+  # rather than over the trial rows.
+  k_sd <- sd(unique(df[c("subject", "K_c")])$K_c)
+
+  cat("\n#### Model 2: WSLS effect at -1 SD, mean and +1 SD of K_c (log-odds) ####\n")
+  print(comparisons(
+    fit2,
+    variables = "reward_oneback",
+    newdata = datagrid(K_c = c(-k_sd, 0, k_sd)),
+    comparison = "lnor",
+    re.form = NA
+  ))
+
+  cat("\n#### The same simple slopes, as odds ratios ####\n")
+  print(comparisons(
+    fit2,
+    variables = "reward_oneback",
+    newdata = datagrid(K_c = c(-k_sd, 0, k_sd)),
+    comparison = "lnor",
+    transform = "exp",
+    re.form = NA
+  ))
+
+  cat("\n#### Model 2: predicted P(stay) at those K levels ####\n")
+  print(predictions(
+    fit2,
+    newdata = datagrid(K_c = c(-k_sd, 0, k_sd), reward_oneback = c(0, 1)),
+    re.form = NA
+  ))
 
   #### CONVERGENCE / SINGULARITY SUMMARY ####
   cat("\n#### Convergence diagnostics ####\n")
