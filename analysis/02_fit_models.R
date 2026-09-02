@@ -3,7 +3,6 @@ rm(list = ls())
 #### SETUP ####
 library(dplyr)
 library(lme4)
-library(lmerTest)
 library(performance)
 library(parameters)
 library(marginaleffects)
